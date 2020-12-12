@@ -5,10 +5,9 @@ from flask import Blueprint
 from flask import request, make_response, jsonify
 from http import HTTPStatus
 from bcrypt import gensalt, hashpw, checkpw
-from flask_jwt_extended import (JWTManager, jwt_required, create_access_token,
-    get_jwt_identity)
+from flask_jwt_extended import jwt_required, create_access_token, get_jwt_identity
 
-def construct(db, jwt):
+def construct(db):
     sender = Blueprint('sender_pages', __name__, static_folder='static')
 
     @sender.route('/signup', methods=['POST'])
@@ -100,6 +99,7 @@ def construct(db, jwt):
         db.hset(f"user:{user['login']}", "lastname", user["lastname"])
         db.hset(f"user:{user['login']}", "address", user["address"])
         db.hset(f"user:{user['login']}", "email", user["email"])
+        db.hset(f"user:{user['login']}", "role", "sender")
 
         hashed = hashpw(user["password"].encode('utf-8'), gensalt(5))
         db.hset(f"user:{user['login']}", "password", hashed)

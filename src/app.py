@@ -1,14 +1,10 @@
 import sys
 from flask import Flask
-import sender
-from courier import courier
-from parcel import parcel
-from label import label
+import sender, label, courier, parcel
 from os import getenv
 from dotenv import load_dotenv
 from redis import Redis
-from flask_jwt_extended import (JWTManager, jwt_required, create_access_token,
-    get_jwt_identity)
+from flask_jwt_extended import JWTManager
 
 
 app = Flask(__name__)
@@ -35,10 +31,10 @@ app.config.from_object(__name__)
 
 jwt = JWTManager(app)
 
-app.register_blueprint(sender.construct(db, jwt), url_prefix='/sender')
-app.register_blueprint(courier, url_prefix='/courier')
-app.register_blueprint(label, url_prefix='/labels')
-app.register_blueprint(parcel, url_prefix='/parcels')
+app.register_blueprint(sender.construct(db), url_prefix='/sender')
+app.register_blueprint(courier.construct(db), url_prefix='/courier')
+app.register_blueprint(label.construct(db), url_prefix='/labels')
+#app.register_blueprint(parcel, url_prefix='/parcels')
 
 @app.route('/')
 def index():
