@@ -1,0 +1,2 @@
+class LabelNotFoundError(Exception):
+    pass

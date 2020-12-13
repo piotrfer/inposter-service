@@ -2,7 +2,9 @@ from http import HTTPStatus
 from flask import Blueprint, request, jsonify, make_response
 from flask_jwt_extended import jwt_required, get_jwt_identity
 import uuid, util
-
+from exceptions.InvalidLabelError import InvalidLabelError
+from exceptions.LabelNotFoundError import LabelNotFoundError
+from exceptions.UserNotAuthorizedError import UserNotAuthorizedError
 
 def construct(db):
     label_bp = Blueprint('label_pages', __name__, static_folder='static')
@@ -11,30 +13,46 @@ def construct(db):
     @jwt_required
     def label_create():
         current_user, role = util.get_current_user(get_jwt_identity())
-        role = 'no role'
         if db.hexists(f"user:{current_user}", "role"):
             role = db.hget(f"user:{current_user}", "role").decode()
-        if role == 'sender':
+        if role == 'user':
             label = {}
             label["user"] = current_user
             label["name"] = request.json.get("name")
             label["address"] = request.json.get("address")
             label["box"] = request.json.get("box")
             label["dimensions"] = request.json.get("dimensions")
-            return validate_label(label)
+            try: 
+                label = validate_label(label)
+                label = save_label(label)
+                return make_response(jsonify(label), HTTPStatus.CREATED)
+            except InvalidLabelError as e:
+                return make_response(jsonify({'msg' : str(e)}), HTTPStatus.BAD_REQUEST)
+
         else:
             return make_response({'msg': 'you have to be a sender to create labels'},
                                  HTTPStatus.UNAUTHORIZED)
 
-    @label_bp.route('/<label_id>', methods=['GET', 'PUT', 'DELETE'])
+    @label_bp.route('/<label_id>', methods=['GET', 'PATCH', 'DELETE'])
     @jwt_required
     def label_single(label_id):
         current_user, role = util.get_current_user(get_jwt_identity())
         if request.method == 'GET':
-            return get_single_label(label_id, current_user, role)
+            try:
+                label = get_single_label(label_id, current_user, role)
+                return make_response(jsonify(label), HTTPStatus.OK)
+            except LabelNotFoundError as e:
+                return make_response(jsonify({'msg' : str(e)}), HTTPStatus.NOT_FOUND)
+            except UserNotAuthorizedError as e:
+                return make_response(jsonify({'msg' : str(e)}), HTTPStatus.UNAUTHORIZED)
+
         elif request.method == 'PUT':
-            # update label to be added
-            pass
+            if role == 'user':
+                #label = update_label(label_id, request.data, current_user)
+                pass
+            elif role == 'courier':
+                #return update_status(label_id, request.data, current_user)
+                pass
         else:
             # delete label to be added
             pass
@@ -43,7 +61,7 @@ def construct(db):
     @jwt_required
     def label_index():
         current_user, role = util.get_current_user(get_jwt_identity())
-        if role == 'sender':
+        if role == 'user':
             labels = get_user_labels(current_user)
             return make_response(jsonify(labels), HTTPStatus.OK)
         elif role == 'courier':
@@ -55,30 +73,26 @@ def construct(db):
                 HTTPStatus.UNAUTHORIZED)
 
     def validate_label(label):
-        errors = []
-        valid = True
         if not label.get("name"):
-            valid = False
-            errors.append("No recipient name provided")
+            raise InvalidLabelError("No recipient name provided")
         if not label.get("address"):
-            valid = False
-            errors.append("No recipient address provided")
+            raise InvalidLabelError("No recipient address provided")
         if not label.get("box"):
-            valid = False
-            errors.append("No mailbox id provided")
+            raise InvalidLabelError("No mailbox id provided")
         if not label.get("dimensions"):
-            valid = False
-            errors.append("No dimensions provided")
-        if not valid:
-            return make_response(jsonify(errors), HTTPStatus.BAD_REQUEST)
+            raise InvalidLabelError("No dimensions provided")
+        
+        return label
 
+    def save_label(label):
         label["id"] = uuid.uuid4()
         db.hset(f"label:{label['id']}", "user", label.get('user'))
         db.hset(f"label:{label['id']}", "name", label.get('name'))
         db.hset(f"label:{label['id']}", "address", label.get('address'))
         db.hset(f"label:{label['id']}", "box", label.get('box'))
         db.hset(f"label:{label['id']}", "dimensions", label.get('dimensions'))
-        return make_response(jsonify(label), HTTPStatus.CREATED)
+        db.hset(f"label:{label['id']}", "status", "created")
+        return label
 
     def get_user_labels(user):
         labels = []
@@ -113,7 +127,7 @@ def construct(db):
     def get_single_label(id, user, role):
         key = f"label:{id}"
         if not db.exists(key):
-            return make_response("No label with given id", HTTPStatus.NOT_FOUND)
+            raise LabelNotFoundError("No label with given id")
         label = {
             "id": key.split(':')[1],
             "name": db.hget(key, "name").decode(),
@@ -122,9 +136,16 @@ def construct(db):
             "dimensions": db.hget(key, "dimensions").decode(),
             "user": db.hget(key, "user").decode()
         }
-        if label['user'] == user or role == 'courier':
-            return make_response(jsonify(label), HTTPStatus.OK)
-        else:
-            return make_response({"msg" : "You are not authorized to see this label"}, HTTPStatus.UNAUTHORIZED)
+        if label['user'] != user and role != 'courier':
+            raise UserNotAuthorizedError("You can only see your own labels or be a courier")
+        
+        return label
+
+
+    def update_label(label_id, data, current_user):        
+        pass
+
+    def update_status(label_id, data, current_user):
+        pass
 
     return label_bp

@@ -1,0 +1,2 @@
+class InvalidCourierError(Exception):
+    pass

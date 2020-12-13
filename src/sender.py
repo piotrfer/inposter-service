@@ -4,6 +4,7 @@ from flask import request, make_response, jsonify
 from http import HTTPStatus
 from bcrypt import gensalt, hashpw, checkpw
 from flask_jwt_extended import create_access_token
+from exceptions.InvalidUserError import InvalidUserError
 
 def construct(db):
     sender = Blueprint('sender_pages', __name__, static_folder='static')
@@ -18,7 +19,12 @@ def construct(db):
         user["email"] = data.get('email')
         user["password"] = data.get('password')
         user["address"] = data.get('address')
-        return validate_signup_user(user)
+        try:
+            user = validate_signup_user(user)
+            user = save_user(user)
+            return make_response(jsonify(user), HTTPStatus.CREATED)
+        except InvalidUserError as e:
+            return make_response(jsonify({'msg' : str(e)}), HTTPStatus.BAD_REQUEST)
 
 
     @sender.route('/login', methods=['POST'])
@@ -27,72 +33,57 @@ def construct(db):
         credentials = {}
         credentials["login"] = data.get('login')
         credentials["password"] = data.get('password')
-        return authenticate_user(credentials)
-
-    @sender.route('/logout')    
-    def sender_logout():
-        return 'sender logout'
+        
+        try:
+            authenticate_user(credentials)
+            access_token = get_access_token(credentials)
+            return make_response(jsonify(access_token), HTTPStatus.OK)
+        except InvalidUserError:
+            return make_response({"msg" : "Invalid login or password"}, HTTPStatus.BAD_REQUEST)
 
     def validate_signup_user(user):
         PL = 'ĄĆĘŁŃÓŚŹŻ'
         pl = 'ąćęłńóśźż'
-        errors = []
 
-        valid = True
+
         if not user["firstname"]:
-            valid = False
-            errors.append("No firstname provided")
+            raise InvalidUserError("No firstname provided")
         elif not re.compile(f'[A-Z{PL}][a-z{pl}]+').match(user["firstname"]):
-            valid = False
-            errors.append("Invalid firstname provided")
+            raise InvalidUserError("Invalid firstname provided")
         
         if not user["lastname"]:
-            valid = False
-            errors.append("No lastname provided")
+            raise InvalidUserError("No lastname provided")
         elif not re.compile(f'[A-Z{PL}][a-z{pl}]+').match(user["lastname"]):
-            valid = False
-            errors.append("Invalid lastname provided")
+            raise InvalidUserError("Invalid lastname provided")
         
         if not user["login"]:
-            valid = False
-            errors.append("No login provided")
+            raise InvalidUserError("No login provided")
         elif not re.compile('[a-z]{3,12}').match(user["login"]):
-            valid = False
-            errors.append("Invalid lastname provided")
+            raise InvalidUserError("Invalid lastname provided")
         elif is_user(user["login"]):
-            valid = False
-            errors.append("User already exists")
+            raise InvalidUserError("User already exists")
         
         if not user["email"]:
-            valid = False
-            errors.append("No email provided")
+            raise InvalidUserError("No email provided")
         elif not re.compile('^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$').match(user["email"]):
-            valid = False
-            errors.append("Invalid email provided")
+            raise InvalidUserError("Invalid email provided")
         
         if not user["password"]:
-            valid = False
-            errors.append("No password provided")
+            raise InvalidUserError("No password provided")
         elif not re.compile('.{8,}').match(user["password"].strip()):
-            valid = False
-            errors.append("Invalid password provided")
+            raise InvalidUserError("Invalid password provided")
         
         if not user["address"]:
-            valid = False
-            errors.append("No address provided")
+            raise InvalidUserError("No address provided")
             # regex should be added later
 
-        if valid:
-            return register_user(user)
-            
-        else:
-            return make_response({"errors" : errors}, HTTPStatus.BAD_REQUEST)
+        return user
 
 
     def is_user(login):
         return db.hexists(f"user:{login}", "password")
 
-    def register_user(user):
+    def save_user(user):
         db.hset(f"user:{user['login']}", "firstname", user["firstname"])
         db.hset(f"user:{user['login']}", "lastname", user["lastname"])
         db.hset(f"user:{user['login']}", "address", user["address"])
@@ -101,32 +92,26 @@ def construct(db):
         hashed = hashpw(user["password"].encode('utf-8'), gensalt(5))
         db.hset(f"user:{user['login']}", "password", hashed)
 
-        return make_response(user, HTTPStatus.CREATED)
+        return user
 
     def authenticate_user(credentials):
-        errors = []
-        valid = True
         if not credentials.get('login') or not credentials.get('password'):
-            errors.append('No login or password provided.')
-            valid = False
+            raise InvalidUserError('No login or password provided.')
         else:
             given_password = credentials['password'].encode('utf-8')
             if not db.exists(f"user:{credentials['login']}"):
-                errors.append("No user with given username")
-                return make_response({"errors" : errors}, HTTPStatus.NOT_FOUND)
+                raise InvalidUserError("No user with given username")
             real_password = db.hget(f"user:{credentials['login']}", "password")
 
 
             if not real_password:
-                errors.append(f"No password for user {credentials['login']}")
+                raise InvalidUserError(f"No password for user {credentials['login']}")
                 valid = False
             if not checkpw(given_password, real_password):
-                errors.append("Wrong password")
+                raise InvalidUserError("Wrong password")
                 valid = False
-        if not valid:
-            return make_response({"errors" : errors}, HTTPStatus.BAD_REQUEST)
-        else:
-            access_token = create_access_token(identity=f"user:{credentials['login']}")
-            return make_response(jsonify(access_token), HTTPStatus.OK)
+    
+    def get_access_token(credentials):
+            return create_access_token(identity=f"user:{credentials['login']}")
 
     return sender

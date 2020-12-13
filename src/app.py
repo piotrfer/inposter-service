@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 from redis import Redis
 from flask_jwt_extended import JWTManager
 
-
 app = Flask(__name__)
 
 load_dotenv()

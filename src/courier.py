@@ -6,6 +6,8 @@ from flask import request, make_response, jsonify
 from http import HTTPStatus
 from bcrypt import gensalt, hashpw, checkpw
 from flask_jwt_extended import jwt_required, create_access_token, get_jwt_identity
+from exceptions.InvalidCourierError import InvalidCourierError
+
 
 def construct(db):
 
@@ -21,7 +23,12 @@ def construct(db):
         courier["email"] = data.get('email')
         courier["password"] = data.get('password')
         courier["licence"] = data.get('licence')
-        return validate_courier(courier)
+        try:
+            courier = validate_courier(courier)
+            courier = save_courier(courier)
+            return make_response(jsonify(courier), HTTPStatus.CREATED)
+        except InvalidCourierError as e:
+            return make_response(jsonify({'msg' : str(e)}), HTTPStatus.BAD_REQUEST)
 
     @courier_bp.route('/login', methods=['POST'])
     def courer_login():
@@ -29,65 +36,52 @@ def construct(db):
         credentials = {}
         credentials["login"] = data.get('login')
         credentials["password"] = data.get('password')
-        return authenticate_courier(credentials)
-
-    @courier_bp.route('/logout')
-    def courier_logout():
-        return 'courier logout'
+        try:
+            authenticate_courier(credentials)
+            access_token = get_access_token(credentials)
+            return make_response(jsonify(access_token), HTTPStatus.OK)
+        except InvalidCourierError:
+            return make_response(jsonify({'msg' : 'Invalid login or password'}), HTTPStatus.BAD_REQUEST)
 
     def validate_courier(courier):
-        errors = []
-        valid = True
-        
         PL = 'ĄĆĘŁŃÓŚŹŻ'
         pl = 'ąćęłńóśźż'
         
         if not courier["firstname"]:
-            valid = False
-            errors.append("No firstname provided")
+            raise InvalidCourierError("No firstname provided")
         elif not re.compile(f'[A-Z{PL}][a-z{pl}]+').match(courier["firstname"]):
-            valid = False
-            errors.append("Invalid firstname provided")
+            raise InvalidCourierError("Invalid firstname provided")
 
         if not courier["lastname"]:
-            valid = False
-            errors.append("No lastname provided")
+            raise InvalidCourierError("No lastname provided")
         elif not re.compile(f'[A-Z{PL}][a-z{pl}]+').match(courier["lastname"]):
-            valid = False
-            errors.append("Invalid lastname provided")
+            raise InvalidCourierError("Invalid lastname provided")
 
         if not courier["login"]:
-            valid = False
-            errors.append("No login provided")
+            raise InvalidCourierError("No login provided")
         elif not re.compile('[a-z]{3,12}').match(courier["login"]):
-            valid = False
-            errors.append("Invalid lastname provided")
+            raise InvalidCourierError("Invalid lastname provided")
         elif is_courier(courier["login"]):
-            valid = False
-            errors.append("courier already exists")
+            raise InvalidCourierError("courier already exists")
 
         if not courier["email"]:
-            valid = False
-            errors.append("No email provided")
+            raise InvalidCourierError("No email provided")
         elif not re.compile('^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$').match(courier["email"]):
-            valid = False
-            errors.append("Invalid email provided")
+            raise InvalidCourierError("Invalid email provided")
 
         if not courier["password"]:
-            valid = False
-            errors.append("No password provided")
+            raise InvalidCourierError("No password provided")
         elif not re.compile('.{8,}').match(courier["password"].strip()):
-            valid = False
-            errors.append("Invalid password provided")
+            raise InvalidCourierError("Invalid password provided")
 
         if not courier["licence"]:
-            valid = False
-            errors.append("No licence provided")
+            raise InvalidCourierError("No licence provided")
             # regex should be added later
         
-        if not valid:
-            return make_response({"errors" : errors}, HTTPStatus.BAD_REQUEST)
+        return courier
 
+
+    def save_courier(courier):
         db.hset(f"courier:{courier['login']}", "firstname", courier["firstname"])
         db.hset(f"courier:{courier['login']}", "lastname", courier["lastname"])
         db.hset(f"courier:{courier['login']}", "licence", courier["licence"])
@@ -96,36 +90,28 @@ def construct(db):
         hashed = hashpw(courier["password"].encode('utf-8'), gensalt(5))
         db.hset(f"courier:{courier['login']}", "password", hashed)
         
-        return make_response(jsonify(courier), HTTPStatus.CREATED)
+        return courier
 
 
     def is_courier(login):
         return db.hexists(f"courier:{login}", "password")
 
     def authenticate_courier(credentials):
-        errors = []
-        valid = True
         if not credentials.get('login') or not credentials.get('password'):
-            errors.append('No login or password provided.')
-            valid = False
+            raise InvalidCourierError('No login or password provided.')
         else:
             given_password = credentials['password'].encode('utf-8')
             if not db.exists(f"courier:{credentials['login']}"):
-                errors.append("No user with given username")
-                return make_response({"errors" : errors}, HTTPStatus.NOT_FOUND)
+                raise InvalidCourierError("No user with given username")
             real_password = db.hget(f"courier:{credentials['login']}", "password")
 
 
             if not real_password:
-                errors.append(f"No password for user {credentials['login']}")
-                valid = False
+                raise InvalidCourierError(f"No password for user {credentials['login']}")
             if not checkpw(given_password, real_password):
-                errors.append("Wrong password")
-                valid = False
-        if not valid:
-            return make_response({"errors" : errors}, HTTPStatus.BAD_REQUEST)
-        else:
+                raise InvalidCourierError("Wrong password")
+        
+    def get_access_token(credentials):
             access_token = create_access_token(identity=f"courier:{credentials['login']}")
-            return make_response(jsonify(access_token), HTTPStatus.OK)
-
+            return access_token
     return courier_bp
