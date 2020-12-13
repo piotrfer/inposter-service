@@ -95,7 +95,6 @@ def construct(db):
 
         hashed = hashpw(courier["password"].encode('utf-8'), gensalt(5))
         db.hset(f"courier:{courier['login']}", "password", hashed)
-        db.hset(f"courier:{courier['login']}", "role", "courier")
         
         return make_response(jsonify(courier), HTTPStatus.CREATED)
 
@@ -111,7 +110,7 @@ def construct(db):
             valid = False
         else:
             given_password = credentials['password'].encode('utf-8')
-            if not db.exists(f"user:{credentials['login']}"):
+            if not db.exists(f"courier:{credentials['login']}"):
                 errors.append("No user with given username")
                 return make_response({"errors" : errors}, HTTPStatus.NOT_FOUND)
             real_password = db.hget(f"courier:{credentials['login']}", "password")
@@ -126,7 +125,7 @@ def construct(db):
         if not valid:
             return make_response({"errors" : errors}, HTTPStatus.BAD_REQUEST)
         else:
-            access_token = create_access_token(identity=credentials['login'])
+            access_token = create_access_token(identity=f"courier:{credentials['login']}")
             return make_response(jsonify(access_token), HTTPStatus.OK)
 
     return courier_bp

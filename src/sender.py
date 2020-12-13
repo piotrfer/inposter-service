@@ -1,11 +1,9 @@
-import http
-from os import access
 import re
 from flask import Blueprint
 from flask import request, make_response, jsonify
 from http import HTTPStatus
 from bcrypt import gensalt, hashpw, checkpw
-from flask_jwt_extended import jwt_required, create_access_token, get_jwt_identity
+from flask_jwt_extended import create_access_token
 
 def construct(db):
     sender = Blueprint('sender_pages', __name__, static_folder='static')
@@ -99,7 +97,6 @@ def construct(db):
         db.hset(f"user:{user['login']}", "lastname", user["lastname"])
         db.hset(f"user:{user['login']}", "address", user["address"])
         db.hset(f"user:{user['login']}", "email", user["email"])
-        db.hset(f"user:{user['login']}", "role", "sender")
 
         hashed = hashpw(user["password"].encode('utf-8'), gensalt(5))
         db.hset(f"user:{user['login']}", "password", hashed)
@@ -129,14 +126,7 @@ def construct(db):
         if not valid:
             return make_response({"errors" : errors}, HTTPStatus.BAD_REQUEST)
         else:
-            access_token = create_access_token(identity=credentials['login'])
+            access_token = create_access_token(identity=f"user:{credentials['login']}")
             return make_response(jsonify(access_token), HTTPStatus.OK)
-
-    @sender.route('/protected', methods=['GET'])
-    @jwt_required
-    def sender_protected():
-        current_user = get_jwt_identity()
-        return make_response(jsonify(logged_in_as=current_user), HTTPStatus.OK)
-
 
     return sender

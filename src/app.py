@@ -16,7 +16,7 @@ REDIS_HOST = getenv("REDIS_HOST")
 REDIS_PASS = getenv("REDIS_PASS")
 JWT_SECRET_KEY = getenv("JWT_SECRET_KEY")
 
-db = Redis(host='redis', port=6379, db=0)
+db = Redis(host=REDIS_HOST, port=6379, db=0)
 
 try:
     db.info()

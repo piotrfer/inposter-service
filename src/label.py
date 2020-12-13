@@ -1,7 +1,7 @@
 from http import HTTPStatus
 from flask import Blueprint, request, jsonify, make_response
 from flask_jwt_extended import jwt_required, get_jwt_identity
-import uuid
+import uuid, util
 
 
 def construct(db):
@@ -10,7 +10,7 @@ def construct(db):
     @label_bp.route('/create', methods=['POST'])
     @jwt_required
     def label_create():
-        current_user = get_jwt_identity()
+        current_user, role = util.get_current_user(get_jwt_identity())
         role = 'no role'
         if db.hexists(f"user:{current_user}", "role"):
             role = db.hget(f"user:{current_user}", "role").decode()
@@ -29,9 +29,9 @@ def construct(db):
     @label_bp.route('/<label_id>', methods=['GET', 'PUT', 'DELETE'])
     @jwt_required
     def label_single(label_id):
-        current_user = get_jwt_identity()
+        current_user, role = util.get_current_user(get_jwt_identity())
         if request.method == 'GET':
-            return get_single_label(label_id, current_user)
+            return get_single_label(label_id, current_user, role)
         elif request.method == 'PUT':
             # update label to be added
             pass
@@ -42,8 +42,7 @@ def construct(db):
     @label_bp.route('/list', methods=['GET'])
     @jwt_required
     def label_index():
-        current_user = get_jwt_identity()
-        role = db.hget(f"user:{current_user}", "role").decode()
+        current_user, role = util.get_current_user(get_jwt_identity())
         if role == 'sender':
             labels = get_user_labels(current_user)
             return make_response(jsonify(labels), HTTPStatus.OK)
@@ -111,8 +110,7 @@ def construct(db):
             labels.append(label)
         return labels
 
-    def get_single_label(id, user):
-        role = db.hget(f"user:{user}", "role").decode()
+    def get_single_label(id, user, role):
         key = f"label:{id}"
         if not db.exists(key):
             return make_response("No label with given id", HTTPStatus.NOT_FOUND)
@@ -128,6 +126,5 @@ def construct(db):
             return make_response(jsonify(label), HTTPStatus.OK)
         else:
             return make_response({"msg" : "You are not authorized to see this label"}, HTTPStatus.UNAUTHORIZED)
-            
 
     return label_bp
