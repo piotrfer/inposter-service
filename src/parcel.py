@@ -19,9 +19,9 @@ def construct(db):
         if role != 'courier':
             return make_response(jsonify({'msg' : 'You have to be a courier to create a package'}), HTTPStatus.UNAUTHORIZED)
         try:
-            parcel = generate_parcel(request.data, current_user)
+            parcel = generate_parcel(request.json, current_user)
             parcel = save_parcel(parcel)
-            update_label(request.data)
+            update_label(request.json)
             return make_response(jsonify(parcel), HTTPStatus.CREATED)
         except LabelNotFoundError as e:
             return make_response(jsonify({'msg' : str(e)}), HTTPStatus.BAD_REQUEST)
@@ -30,12 +30,12 @@ def construct(db):
     @parcel_bp.route('/<id>', methods=['PATCH'])
     @jwt_required
     def parcel_single(id):
-        current_user, role = get_jwt_identity()
+        current_user, role = util.get_current_user(get_jwt_identity())
         if request.method=='PATCH':
             if role != 'courier':
                 return make_response(jsonify({'msg' : 'You have to be a courier to update parcels'}), HTTPStatus.BAD_REQUEST)
             try:
-                parcel = update_parcel(id, request.data)
+                parcel = update_parcel(id, request.json)
                 return make_response(jsonify(parcel), HTTPStatus.OK)
             except ParcelNotFoundError as e:
                 return make_response(jsonify({'msg' : str(e)}), HTTPStatus.NOT_FOUND)
@@ -53,7 +53,7 @@ def construct(db):
     @parcel_bp.route('/list', methods=['GET'])
     @jwt_required    
     def parcel_list():
-        current_user, role = get_jwt_identity()
+        current_user, role = util.get_current_user(get_jwt_identity())
         if role == 'courier':
             parcels = get_all_courier_parcels(current_user)
             return make_response(jsonify(parcels), HTTPStatus.OK)
@@ -76,7 +76,7 @@ def construct(db):
         return parcel
     
     def save_parcel(parcel):
-        parcel['id'] = uuid.uuid4()
+        parcel['id'] = str(uuid.uuid4())
         db.hset(f"parcel:{parcel['id']}", "id", parcel.get('id'))
         db.hset(f"parcel:{parcel['id']}", "label", parcel.get('label'))
         db.hset(f"parcel:{parcel['id']}", "courier", parcel.get('courier'))
@@ -100,10 +100,11 @@ def construct(db):
         if not is_parcel(id):
             raise ParcelNotFoundError("No parcel with given id")
         updated_status = data.get("status")
-        if updated_status:
+        status_list = ["received", "in progress", "delivered"]
+        if updated_status in status_list:
            db.hset(f"parcel:{id}", "status", updated_status)
            if updated_status == 'delivered':
-               db.hset(f"parcel{id}", "delivered", time())
+               db.hset(f"parcel:{id}", "delivered", time())
         return get_single_parcel(id)
 
     def get_single_parcel(id):

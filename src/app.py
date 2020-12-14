@@ -33,7 +33,7 @@ jwt = JWTManager(app)
 app.register_blueprint(sender.construct(db), url_prefix='/sender')
 app.register_blueprint(courier.construct(db), url_prefix='/courier')
 app.register_blueprint(label.construct(db), url_prefix='/labels')
-#app.register_blueprint(parcel, url_prefix='/parcels')
+app.register_blueprint(parcel.construct(db), url_prefix='/parcels')
 
 @app.route('/')
 def index():

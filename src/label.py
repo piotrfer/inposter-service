@@ -44,7 +44,7 @@ def construct(db):
                     label = get_single_label(label_id)
                     return make_response(jsonify(label), HTTPStatus.OK)
                 else:
-                    make_response(jsonify({'msg' : 'You have to be an owner or a courier to see this label'}))
+                    return make_response(jsonify({'msg' : 'You have to be an owner or a courier to see this label'}), HTTPStatus.UNAUTHORIZED)
             except LabelNotFoundError as e:
                 return make_response(jsonify({'msg' : str(e)}), HTTPStatus.NOT_FOUND)
             except UserNotAuthorizedError as e:
@@ -54,7 +54,7 @@ def construct(db):
             if role == 'user':
                 try:
                     if is_authorized(label_id, current_user, role):
-                        label = update_label(request.data)
+                        label = update_label(label_id,request.json)
                         return make_response(jsonify(label), HTTPStatus.OK)
                     return make_response(jsonify({'msg' : 'You can only edit labels that you own'}), HTTPStatus.UNAUTHORIZED)
                 except LabelNotFoundError as e:
@@ -139,7 +139,8 @@ def construct(db):
             "address": db.hget(key, "address").decode(),
             "box": db.hget(key, "box").decode(),
             "dimensions": db.hget(key, "dimensions").decode(),
-            "user": db.hget(key, "user").decode()
+            "user": db.hget(key, "user").decode(),
+            "sent": db.hget(key, "sent").decode()
         }
         return label
 
@@ -155,11 +156,15 @@ def construct(db):
         return db.exists(f"label:{id}")
 
     def is_sent(label_id):
-        return db.hget(f"label:{label_id}", "sent") == 'True'
+        return db.hget(f"label:{label_id}", "sent").decode() == 'True'
 
     def update_label(label_id, data):    
         if is_sent(label_id):
             raise InvalidLabelError("You can't edit label that is already sent")
+        
+        if not data:
+            raise InvalidLabelError("No data to patch")
+        
         updated_label = {
                 "name" : data.get("name"),
                 "address" : data.get("address"),

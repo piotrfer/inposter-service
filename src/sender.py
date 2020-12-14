@@ -104,13 +104,10 @@ def construct(db):
                 raise InvalidUserError("No user with given username")
             real_password = db.hget(f"user:{credentials['login']}", "password")
 
-
             if not real_password:
                 raise InvalidUserError(f"No password for user {credentials['login']}")
-                valid = False
             if not checkpw(given_password, real_password):
                 raise InvalidUserError("Wrong password")
-                valid = False
     
     def get_access_token(credentials):
             return create_access_token(identity=f"user:{credentials['login']}")
