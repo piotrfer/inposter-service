@@ -46,15 +46,13 @@ def construct(db):
             except UserNotAuthorizedError as e:
                 return make_response(jsonify({'msg' : str(e)}), HTTPStatus.UNAUTHORIZED)
 
-        elif request.method == 'PUT':
+        elif request.method == 'PATCH':
             if role == 'user':
+                #update label while it's still not sent
                 #label = update_label(label_id, request.data, current_user)
                 pass
-            elif role == 'courier':
-                #return update_status(label_id, request.data, current_user)
-                pass
         else:
-            # delete label to be added
+            # delete label while it's still not sent
             pass
 
     @label_bp.route('/list', methods=['GET'])
@@ -91,7 +89,7 @@ def construct(db):
         db.hset(f"label:{label['id']}", "address", label.get('address'))
         db.hset(f"label:{label['id']}", "box", label.get('box'))
         db.hset(f"label:{label['id']}", "dimensions", label.get('dimensions'))
-        db.hset(f"label:{label['id']}", "status", "created")
+        db.hset(f"label:{label['id']}", "sent", "false")
         return label
 
     def get_user_labels(user):
@@ -143,9 +141,6 @@ def construct(db):
 
 
     def update_label(label_id, data, current_user):        
-        pass
-
-    def update_status(label_id, data, current_user):
         pass
 
     return label_bp
