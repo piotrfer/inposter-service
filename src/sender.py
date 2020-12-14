@@ -12,13 +12,14 @@ def construct(db):
     @sender.route('/signup', methods=['POST'])
     def sender_signup():
         data = request.json
-        user = {}
-        user["firstname"] = data.get('firstname')
-        user["lastname"] = data.get('lastname')
-        user["login"] = data.get('login')
-        user["email"] = data.get('email')
-        user["password"] = data.get('password')
-        user["address"] = data.get('address')
+        user = {
+            "firstname" : data.get('firstname'),
+            "lastname" : data.get('lastname'),
+            "login" : data.get('login'),
+            "email" : data.get('email'),
+            "password" : data.get('password'),
+            "address" : data.get('address')
+        }
         try:
             user = validate_signup_user(user)
             user = save_user(user)
@@ -30,10 +31,10 @@ def construct(db):
     @sender.route('/login', methods=['POST'])
     def sender_login():
         data = request.json
-        credentials = {}
-        credentials["login"] = data.get('login')
-        credentials["password"] = data.get('password')
-        
+        credentials = {
+            "login" : data.get('login'),
+            "password" : data.get('password')
+        }
         try:
             authenticate_user(credentials)
             access_token = get_access_token(credentials)

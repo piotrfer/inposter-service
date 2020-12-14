@@ -16,12 +16,13 @@ def construct(db):
         if db.hexists(f"user:{current_user}", "role"):
             role = db.hget(f"user:{current_user}", "role").decode()
         if role == 'user':
-            label = {}
-            label["user"] = current_user
-            label["name"] = request.json.get("name")
-            label["address"] = request.json.get("address")
-            label["box"] = request.json.get("box")
-            label["dimensions"] = request.json.get("dimensions")
+            label = {
+                "user" : current_user,
+                "name" : request.json.get("name"),
+                "address" : request.json.get("address"),
+                "box" : request.json.get("box"),
+                "dimensions" : request.json.get("dimensions")
+            }
             try: 
                 label = validate_label(label)
                 label = save_label(label)

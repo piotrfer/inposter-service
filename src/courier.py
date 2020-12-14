@@ -16,13 +16,14 @@ def construct(db):
     @courier_bp.route('/signup', methods=['POST'])
     def courier_signup():
         data = request.json
-        courier = {}
-        courier["firstname"] = data.get('firstname')
-        courier["lastname"] = data.get('lastname')
-        courier["login"] = data.get('login')
-        courier["email"] = data.get('email')
-        courier["password"] = data.get('password')
-        courier["licence"] = data.get('licence')
+        courier = {
+            "firstname" : data.get('firstname'),
+            "lastname" : data.get('lastname'),
+            "login" : data.get('login'),
+            "email" : data.get('email'),
+            "password" : data.get('password'),
+            "licence" : data.get('licence')
+        }
         try:
             courier = validate_courier(courier)
             courier = save_courier(courier)
@@ -33,9 +34,10 @@ def construct(db):
     @courier_bp.route('/login', methods=['POST'])
     def courer_login():
         data = request.json
-        credentials = {}
-        credentials["login"] = data.get('login')
-        credentials["password"] = data.get('password')
+        credentials = {
+            "login" : data.get('login'),
+            "password" : data.get('password')
+        }
         try:
             authenticate_courier(credentials)
             access_token = get_access_token(credentials)
