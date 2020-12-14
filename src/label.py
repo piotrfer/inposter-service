@@ -40,8 +40,11 @@ def construct(db):
         current_user, role = util.get_current_user(get_jwt_identity())
         if request.method == 'GET':
             try:
-                label = get_single_label(label_id, current_user, role)
-                return make_response(jsonify(label), HTTPStatus.OK)
+                if is_authorized(label_id, current_user, role):
+                    label = get_single_label(label_id)
+                    return make_response(jsonify(label), HTTPStatus.OK)
+                else:
+                    make_response(jsonify({'msg' : 'You have to be an owner or a courier to see this label'}))
             except LabelNotFoundError as e:
                 return make_response(jsonify({'msg' : str(e)}), HTTPStatus.NOT_FOUND)
             except UserNotAuthorizedError as e:
@@ -98,13 +101,8 @@ def construct(db):
         for key in db.scan_iter("label:*"):
             key = key.decode()
             if db.hget(key, "user").decode() == user:
-                label = {
-                    "id": key.split(':')[1],
-                    "name": db.hget(key, "name").decode(),
-                    "address": db.hget(key, "address").decode(),
-                    "box": db.hget(key, "box").decode(),
-                    "dimensions": db.hget(key, "dimensions").decode()
-                }
+                id = key.split(':')[1]
+                label = get_single_label(id)
                 labels.append(label)
         return labels
 
@@ -112,21 +110,16 @@ def construct(db):
         labels = []
         for key in db.scan_iter("label:*"):
             key = key.decode()
-            label = {
-                "id": key.split(':')[1],
-                "name": db.hget(key, "name").decode(),
-                "address": db.hget(key, "address").decode(),
-                "box": db.hget(key, "box").decode(),
-                "dimensions": db.hget(key, "dimensions").decode(),
-                "user": db.hget(key, "user").decode()
-            }
+            id = key.split(':')[1]
+            label = get_single_label(id)
             labels.append(label)
         return labels
 
-    def get_single_label(id, user, role):
-        key = f"label:{id}"
-        if not db.exists(key):
+    def get_single_label(id):
+        if not is_label(id):
             raise LabelNotFoundError("No label with given id")
+        
+        key = f"label:{id}"
         label = {
             "id": key.split(':')[1],
             "name": db.hget(key, "name").decode(),
@@ -135,11 +128,19 @@ def construct(db):
             "dimensions": db.hget(key, "dimensions").decode(),
             "user": db.hget(key, "user").decode()
         }
-        if label['user'] != user and role != 'courier':
-            raise UserNotAuthorizedError("You can only see your own labels or be a courier")
-        
+
         return label
 
+    def is_label(id):
+        return db.exists(f"label:{id}")
+
+    def is_authorized(id, current_user, role):
+        if role == 'courier':
+            return True
+        if not is_label(id):
+            raise LabelNotFoundError("No label with given id")
+        user = db.hget(f"label:{id}", "user").decode()
+        return user == current_user
 
     def update_label(label_id, data, current_user):        
         pass
