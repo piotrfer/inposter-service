@@ -50,14 +50,29 @@ def construct(db):
             except UserNotAuthorizedError as e:
                 return make_response(jsonify({'msg' : str(e)}), HTTPStatus.UNAUTHORIZED)
 
-        elif request.method == 'PATCH':
+        if request.method == 'PATCH':
             if role == 'user':
-                #update label while it's still not sent
-                #label = update_label(label_id, request.data, current_user)
-                pass
-        else:
-            # delete label while it's still not sent
-            pass
+                try:
+                    if is_authorized(label_id, current_user, role):
+                        label = update_label(request.data)
+                        return make_response(jsonify(label), HTTPStatus.OK)
+                    return make_response(jsonify({'msg' : 'You can only edit labels that you own'}), HTTPStatus.UNAUTHORIZED)
+                except LabelNotFoundError as e:
+                    return make_response(jsonify({'msg' : str(e)}), HTTPStatus.NOT_FOUND)
+                except InvalidLabelError as e:
+                    return make_response(jsonify({'msg' : str(e)}), HTTPStatus.BAD_REQUEST)
+
+        if request.method == 'DELETE':
+            if role == 'user':
+                try:
+                    if is_authorized(label_id, current_user, role):
+                        delete_label(label_id)
+                        return make_response(jsonify({'msg' : ''}),HTTPStatus.NO_CONTENT)
+                    return make_response(jsonify({'msg' : 'You can only delete labels that you own'}), HTTPStatus.UNAUTHORIZED)
+                except LabelNotFoundError as e:
+                    return make_response(jsonify({'msg' : str(e)}), HTTPStatus.NOT_FOUND)
+                except InvalidLabelError as e:
+                    return make_response(jsonify({'msg' : str(e)}), HTTPStatus.BAD_REQUEST)
 
     @label_bp.route('/list', methods=['GET'])
     @jwt_required
@@ -70,9 +85,7 @@ def construct(db):
             labels = get_all_labels()
             return make_response(jsonify(labels), HTTPStatus.OK)
         else:
-            return make_response(
-                {'msg': 'you have to be a sender or a courier to see labels'},
-                HTTPStatus.UNAUTHORIZED)
+            return make_response({'msg': 'you have to be a sender or a courier to see labels'},HTTPStatus.UNAUTHORIZED)
 
     def validate_label(label):
         if not label.get("name"):
@@ -93,7 +106,7 @@ def construct(db):
         db.hset(f"label:{label['id']}", "address", label.get('address'))
         db.hset(f"label:{label['id']}", "box", label.get('box'))
         db.hset(f"label:{label['id']}", "dimensions", label.get('dimensions'))
-        db.hset(f"label:{label['id']}", "sent", "false")
+        db.hset(f"label:{label['id']}", "sent", "False")
         return label
 
     def get_user_labels(user):
@@ -128,11 +141,7 @@ def construct(db):
             "dimensions": db.hget(key, "dimensions").decode(),
             "user": db.hget(key, "user").decode()
         }
-
         return label
-
-    def is_label(id):
-        return db.exists(f"label:{id}")
 
     def is_authorized(id, current_user, role):
         if role == 'courier':
@@ -141,8 +150,32 @@ def construct(db):
             raise LabelNotFoundError("No label with given id")
         user = db.hget(f"label:{id}", "user").decode()
         return user == current_user
+    
+    def is_label(id):
+        return db.exists(f"label:{id}")
 
-    def update_label(label_id, data, current_user):        
-        pass
+    def is_sent(label_id):
+        return db.hget(f"label:{label_id}", "sent") == 'True'
+
+    def update_label(label_id, data):    
+        if is_sent(label_id):
+            raise InvalidLabelError("You can't edit label that is already sent")
+        updated_label = {
+                "name" : data.get("name"),
+                "address" : data.get("address"),
+                "box" : data.get("box"),
+                "dimensions" : data.get("dimensions")
+            }
+        for key, value in updated_label.items():
+            if value:
+                db.hset(f"label:{label_id}", key, value)
+        return get_single_label(label_id)
+
+    def delete_label(label_id):
+        if is_sent(label_id):
+            raise InvalidLabelError("You can't edit label that is already sent")
+        if not is_label(label_id):
+            raise LabelNotFoundError("No label with given id")
+        db.delete(f"label:{label_id}")
 
     return label_bp

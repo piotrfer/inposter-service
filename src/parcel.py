@@ -88,7 +88,7 @@ def construct(db):
     def update_label(data):
         if not is_label(data.get('label')):
             raise LabelNotFoundError("No label with given id")
-        db.hset(f"label:{data.get('label')}", "sent", "true")
+        db.hset(f"label:{data.get('label')}", "sent", "True")
 
     def is_label(label_id):
         return db.exists(f"label:{label_id}")
