@@ -10,22 +10,7 @@ from time import time
 
 def construct(db):
     parcel_bp = Blueprint('parcel_pages', __name__, static_folder='static')
-    
-    #generate parcel with label
-    @parcel_bp.route('/create', methods=['POST'])
-    @jwt_required
-    def parcel_create():
-        current_user, role = util.get_current_user(get_jwt_identity())
-        if role != 'courier':
-            return make_response(jsonify({'msg' : 'You have to be a courier to create a package'}), HTTPStatus.UNAUTHORIZED)
-        try:
-            parcel = generate_parcel(request.json, current_user)
-            parcel = save_parcel(parcel)
-            update_label(request.json)
-            return make_response(jsonify(parcel), HTTPStatus.CREATED)
-        except LabelNotFoundError as e:
-            return make_response(jsonify({'msg' : str(e)}), HTTPStatus.BAD_REQUEST)
-
+  
     #get single parcel, update its status
     @parcel_bp.route('/<id>', methods=['PATCH'])
     @jwt_required
@@ -50,18 +35,29 @@ def construct(db):
                 return make_response(jsonify({'msg' : str(e)}), HTTPStatus.NOT_FOUND)
 
     #get all your packages as a sender or courier
-    @parcel_bp.route('/list', methods=['GET'])
+    @parcel_bp.route('/list', methods=['GET', 'POST'])
     @jwt_required    
     def parcel_list():
         current_user, role = util.get_current_user(get_jwt_identity())
-        if role == 'courier':
-            parcels = get_all_courier_parcels(current_user)
-            return make_response(jsonify(parcels), HTTPStatus.OK)
-        elif role == 'user':
-            parcels = get_all_sender_parcels(current_user)
-            return make_response(jsonify(parcels), HTTPStatus.OK)
-        else:
-            return make_response(jsonify({'msg' : 'You have to be either a courier or a sender to see your parcels'}), HTTPStatus.UNAUTHORIZED)
+        if request.method == 'GET':
+            if role == 'courier':
+                parcels = get_all_courier_parcels(current_user)
+                return make_response(jsonify(parcels), HTTPStatus.OK)
+            elif role == 'user':
+                parcels = get_all_sender_parcels(current_user)
+                return make_response(jsonify(parcels), HTTPStatus.OK)
+            else:
+                return make_response(jsonify({'msg' : 'You have to be either a courier or a sender to see your parcels'}), HTTPStatus.UNAUTHORIZED)
+        if request.method == 'POST':
+            if role != 'courier':
+                return make_response(jsonify({'msg' : 'You have to be a courier to create a package'}), HTTPStatus.UNAUTHORIZED)
+            try:
+                parcel = generate_parcel(request.json, current_user)
+                parcel = save_parcel(parcel)
+                update_label(request.json)
+                return make_response(jsonify(parcel), HTTPStatus.CREATED)
+            except LabelNotFoundError as e:
+                return make_response(jsonify({'msg' : str(e)}), HTTPStatus.BAD_REQUEST)
 
     def generate_parcel(data, current_user):
         if not is_label(data.get('label')):

@@ -5,6 +5,7 @@ from http import HTTPStatus
 from bcrypt import gensalt, hashpw, checkpw
 from flask_jwt_extended import create_access_token
 from exceptions.InvalidUserError import InvalidUserError
+from flask_hal import document 
 
 def construct(db):
     sender = Blueprint('sender_pages', __name__, static_folder='static')
@@ -23,7 +24,8 @@ def construct(db):
         try:
             user = validate_signup_user(user)
             user = save_user(user)
-            return make_response(jsonify(user), HTTPStatus.CREATED)
+            #return make_response(jsonify(user), HTTPStatus.CREATED)
+            return document.Document(data=user, status=HTTPStatus.CREATED).to_json()
         except InvalidUserError as e:
             return make_response(jsonify({'msg' : str(e)}), HTTPStatus.BAD_REQUEST)
 

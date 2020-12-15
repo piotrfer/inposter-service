@@ -5,8 +5,10 @@ from os import getenv
 from dotenv import load_dotenv
 from redis import Redis
 from flask_jwt_extended import JWTManager
+from flask_hal import HAL
 
 app = Flask(__name__)
+HAL(app)
 
 load_dotenv()
 SECRET_KEY = getenv("SECRET_KEY")

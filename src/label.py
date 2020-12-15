@@ -9,31 +9,6 @@ from exceptions.UserNotAuthorizedError import UserNotAuthorizedError
 def construct(db):
     label_bp = Blueprint('label_pages', __name__, static_folder='static')
 
-    @label_bp.route('/create', methods=['POST'])
-    @jwt_required
-    def label_create():
-        current_user, role = util.get_current_user(get_jwt_identity())
-        if db.hexists(f"user:{current_user}", "role"):
-            role = db.hget(f"user:{current_user}", "role").decode()
-        if role == 'user':
-            label = {
-                "user" : current_user,
-                "name" : request.json.get("name"),
-                "address" : request.json.get("address"),
-                "box" : request.json.get("box"),
-                "dimensions" : request.json.get("dimensions")
-            }
-            try: 
-                label = validate_label(label)
-                label = save_label(label)
-                return make_response(jsonify(label), HTTPStatus.CREATED)
-            except InvalidLabelError as e:
-                return make_response(jsonify({'msg' : str(e)}), HTTPStatus.BAD_REQUEST)
-
-        else:
-            return make_response({'msg': 'you have to be a sender to create labels'},
-                                 HTTPStatus.UNAUTHORIZED)
-
     @label_bp.route('/<label_id>', methods=['GET', 'PATCH', 'DELETE'])
     @jwt_required
     def label_single(label_id):
@@ -74,18 +49,41 @@ def construct(db):
                 except InvalidLabelError as e:
                     return make_response(jsonify({'msg' : str(e)}), HTTPStatus.BAD_REQUEST)
 
-    @label_bp.route('/list', methods=['GET'])
+    @label_bp.route('/list', methods=['GET', 'POST'])
     @jwt_required
-    def label_index():
+    def label_list():
         current_user, role = util.get_current_user(get_jwt_identity())
-        if role == 'user':
-            labels = get_user_labels(current_user)
-            return make_response(jsonify(labels), HTTPStatus.OK)
-        elif role == 'courier':
-            labels = get_all_labels()
-            return make_response(jsonify(labels), HTTPStatus.OK)
-        else:
-            return make_response({'msg': 'you have to be a sender or a courier to see labels'},HTTPStatus.UNAUTHORIZED)
+        if request.method == 'GET':
+            if role == 'user':
+                labels = get_user_labels(current_user)
+                return make_response(jsonify(labels), HTTPStatus.OK)
+            elif role == 'courier':
+                labels = get_all_labels()
+                return make_response(jsonify(labels), HTTPStatus.OK)
+            else:
+                return make_response({'msg': 'you have to be a sender or a courier to see labels'},HTTPStatus.UNAUTHORIZED)
+        if request.method == 'POST':
+            if db.hexists(f"user:{current_user}", "role"):
+                role = db.hget(f"user:{current_user}", "role").decode()
+            if role == 'user':
+                label = {
+                    "user" : current_user,
+                    "name" : request.json.get("name"),
+                    "address" : request.json.get("address"),
+                    "box" : request.json.get("box"),
+                    "dimensions" : request.json.get("dimensions")
+                }
+                try: 
+                    label = validate_label(label)
+                    label = save_label(label)
+                    return make_response(jsonify(label), HTTPStatus.CREATED)
+                except InvalidLabelError as e:
+                    return make_response(jsonify({'msg' : str(e)}), HTTPStatus.BAD_REQUEST)
+
+            else:
+                return make_response({'msg': 'you have to be a sender to create labels'},
+                                    HTTPStatus.UNAUTHORIZED)
+
 
     def validate_label(label):
         if not label.get("name"):
