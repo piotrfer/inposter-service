@@ -2,12 +2,24 @@ from http import HTTPStatus
 from flask import Blueprint, request, jsonify, make_response
 from flask_jwt_extended import jwt_required, get_jwt_identity
 import uuid, util
+from flask_hal.document import Document, Embedded
+from flask_hal.link import Link
 from exceptions.InvalidLabelError import InvalidLabelError
 from exceptions.LabelNotFoundError import LabelNotFoundError
 from exceptions.UserNotAuthorizedError import UserNotAuthorizedError
 
 def construct(db):
     label_bp = Blueprint('label_pages', __name__, static_folder='static')
+
+    @label_bp.route('/')
+    def label_index():
+        links = []
+        links.append('list', '/labels/list')
+        links.append('find', '/labels/<id>')
+        document = Document(data={}, links=links)
+        return document.to_json()
+
+
 
     @label_bp.route('/<label_id>', methods=['GET', 'PATCH', 'DELETE'])
     @jwt_required
@@ -16,38 +28,51 @@ def construct(db):
         if request.method == 'GET':
             try:
                 if is_authorized(label_id, current_user, role):
+                    links = []
+                    links.append(Link('labels:list', '/labels/list'))
                     label = get_single_label(label_id)
-                    return make_response(jsonify(label), HTTPStatus.OK)
+                    if (label["sent"]) == False:
+                        if role == 'user':
+                            links.append(Link('label:patch', f'/labels/{label["id"]}'))
+                            links.append(Link('label:delete', f'/labels/{label["id"]}'))
+                        if role == 'courier':
+                            links.append(Link('label:generate', '/parcels'))
+                    return Document(data=label, links=links).to_json()
                 else:
-                    return make_response(jsonify({'msg' : 'You have to be an owner or a courier to see this label'}), HTTPStatus.UNAUTHORIZED)
+                    return make_response(jsonify({'error' : 'You have to be an owner or a courier to see this label'}), HTTPStatus.UNAUTHORIZED)
             except LabelNotFoundError as e:
-                return make_response(jsonify({'msg' : str(e)}), HTTPStatus.NOT_FOUND)
+                return make_response(jsonify({'error' : str(e)}), HTTPStatus.NOT_FOUND)
             except UserNotAuthorizedError as e:
-                return make_response(jsonify({'msg' : str(e)}), HTTPStatus.UNAUTHORIZED)
+                return make_response(jsonify({'error' : str(e)}), HTTPStatus.UNAUTHORIZED)
 
         if request.method == 'PATCH':
             if role == 'user':
                 try:
                     if is_authorized(label_id, current_user, role):
+                        links = []
+                        links.append(Link('labels:list', '/labels/list'))
                         label = update_label(label_id,request.json)
-                        return make_response(jsonify(label), HTTPStatus.OK)
-                    return make_response(jsonify({'msg' : 'You can only edit labels that you own'}), HTTPStatus.UNAUTHORIZED)
+                        if label['sent' == False]:
+                            links.append(Link('label:patch', f'/labels/{label["id"]}'))
+                            links.append(Link('label:delete', f'/labels/{label["id"]}'))
+                        return Document(data=label, links=links).to_json(), HTTPStatus.OK
+                    return make_response(jsonify({'error' : 'You can only edit labels that you own'}), HTTPStatus.UNAUTHORIZED)
                 except LabelNotFoundError as e:
-                    return make_response(jsonify({'msg' : str(e)}), HTTPStatus.NOT_FOUND)
+                    return make_response(jsonify({'error' : str(e)}), HTTPStatus.NOT_FOUND)
                 except InvalidLabelError as e:
-                    return make_response(jsonify({'msg' : str(e)}), HTTPStatus.BAD_REQUEST)
+                    return make_response(jsonify({'error' : str(e)}), HTTPStatus.BAD_REQUEST)
 
         if request.method == 'DELETE':
             if role == 'user':
                 try:
                     if is_authorized(label_id, current_user, role):
                         delete_label(label_id)
-                        return make_response(jsonify({'msg' : ''}),HTTPStatus.NO_CONTENT)
-                    return make_response(jsonify({'msg' : 'You can only delete labels that you own'}), HTTPStatus.UNAUTHORIZED)
+                        return make_response(''),HTTPStatus.NO_CONTENT
+                    return make_response(jsonify({'error' : 'You can only delete labels that you own'}), HTTPStatus.UNAUTHORIZED)
                 except LabelNotFoundError as e:
-                    return make_response(jsonify({'msg' : str(e)}), HTTPStatus.NOT_FOUND)
+                    return make_response(jsonify({'error' : str(e)}), HTTPStatus.NOT_FOUND)
                 except InvalidLabelError as e:
-                    return make_response(jsonify({'msg' : str(e)}), HTTPStatus.BAD_REQUEST)
+                    return make_response(jsonify({'error' : str(e)}), HTTPStatus.BAD_REQUEST)
 
     @label_bp.route('/list', methods=['GET', 'POST'])
     @jwt_required
@@ -55,13 +80,17 @@ def construct(db):
         current_user, role = util.get_current_user(get_jwt_identity())
         if request.method == 'GET':
             if role == 'user':
+                links = []
+                links.append('find', '/labels/<id>')
                 labels = get_user_labels(current_user)
-                return make_response(jsonify(labels), HTTPStatus.OK)
+                return Document(embedded={'items' : Embedded(data=labels)}, links=links).to_json()
             elif role == 'courier':
+                links = []
+                links.append('find', '/labels/<id>')
                 labels = get_all_labels()
-                return make_response(jsonify(labels), HTTPStatus.OK)
+                return Document(embedded={'items' : Embedded(data=labels)}, links=links).to_json()
             else:
-                return make_response({'msg': 'you have to be a sender or a courier to see labels'},HTTPStatus.UNAUTHORIZED)
+                return make_response({'error': 'you have to be a sender or a courier to see labels'},HTTPStatus.UNAUTHORIZED)
         if request.method == 'POST':
             if db.hexists(f"user:{current_user}", "role"):
                 role = db.hget(f"user:{current_user}", "role").decode()
@@ -74,15 +103,18 @@ def construct(db):
                     "dimensions" : request.json.get("dimensions")
                 }
                 try: 
+                    links = []
                     label = validate_label(label)
                     label = save_label(label)
-                    return make_response(jsonify(label), HTTPStatus.CREATED)
+                    links.append(Link('labels:list', '/labels/list'))
+                    links.append(Link('label:patch', f'/labels/{label["id"]}'))
+                    links.append(Link('label:delete', f'/labels/{label["id"]}'))
+                    return Document(data=label, links=links).to_json(), HTTPStatus.CREATED
                 except InvalidLabelError as e:
-                    return make_response(jsonify({'msg' : str(e)}), HTTPStatus.BAD_REQUEST)
+                    return make_response(jsonify({'error' : str(e)}), HTTPStatus.BAD_REQUEST)
 
             else:
-                return make_response({'msg': 'you have to be a sender to create labels'},
-                                    HTTPStatus.UNAUTHORIZED)
+                return make_response({'error': 'you have to be a sender to create labels'}, HTTPStatus.UNAUTHORIZED)
 
 
     def validate_label(label):
@@ -108,23 +140,25 @@ def construct(db):
         return label
 
     def get_user_labels(user):
-        labels = []
+        items = []
         for key in db.scan_iter("label:*"):
             key = key.decode()
             if db.hget(key, "user").decode() == user:
                 id = key.split(':')[1]
                 label = get_single_label(id)
-                labels.append(label)
-        return labels
+                link = Link('self', f'/labels/{id}')
+                items.append(Embedded(data=label, links=[link]))
+        return items
 
     def get_all_labels():
-        labels = []
+        items = []
         for key in db.scan_iter("label:*"):
             key = key.decode()
             id = key.split(':')[1]
             label = get_single_label(id)
-            labels.append(label)
-        return labels
+            link = Link('self',f'/labels/{id}')
+            items.append(Embedded(data=label, links=[link]))
+        return items
 
     def get_single_label(id):
         if not is_label(id):

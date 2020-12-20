@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 from redis import Redis
 from flask_jwt_extended import JWTManager
 from flask_hal import HAL
+from flask_hal.link import Link
+from flask_hal.document import Document, Embedded
 
 app = Flask(__name__)
 HAL(app)
@@ -39,7 +41,13 @@ app.register_blueprint(parcel.construct(db), url_prefix='/parcels')
 
 @app.route('/')
 def index():
-    return 'index'
+    links = []
+    links.append(Link('sender', '/sender'))
+    links.append(Link('courier', '/courier'))
+    links.append(Link('labels', '/labels'))
+    links.append(Link('parcels', '/parcels'))
+    document = Document(data={}, links=links)
+    return document.to_json()
 
 if __name__ == '__main__':
     app.run(debug=True)

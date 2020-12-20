@@ -5,13 +5,24 @@ from flask import Blueprint
 from flask import request, make_response, jsonify
 from http import HTTPStatus
 from bcrypt import gensalt, hashpw, checkpw
-from flask_jwt_extended import jwt_required, create_access_token, get_jwt_identity
+from flask_jwt_extended import create_access_token
+from flask_hal.document import Document
+from flask_hal.link import Link
 from exceptions.InvalidCourierError import InvalidCourierError
 
 
 def construct(db):
 
     courier_bp = Blueprint('courier_pages', __name__, static_folder='static')
+
+    @courier_bp.route('/')
+    def courier_index():
+        links = []
+        links.append(Link('signup', '/courier/signup'))
+        links.append(Link('login', '/courier/login'))
+        links.append(Link('sender', '/sender'))
+        return Document(data={}, links=links).to_json()
+
 
     @courier_bp.route('/signup', methods=['POST'])
     def courier_signup():
@@ -27,9 +38,9 @@ def construct(db):
         try:
             courier = validate_courier(courier)
             courier = save_courier(courier)
-            return make_response(jsonify(courier), HTTPStatus.CREATED)
+            return Document(data=courier).to_json(), HTTPStatus.CREATED
         except InvalidCourierError as e:
-            return make_response(jsonify({'msg' : str(e)}), HTTPStatus.BAD_REQUEST)
+            return make_response(jsonify({'error' : str(e)}), HTTPStatus.BAD_REQUEST)
 
     @courier_bp.route('/login', methods=['POST'])
     def courer_login():
@@ -41,9 +52,9 @@ def construct(db):
         try:
             authenticate_courier(credentials)
             access_token = get_access_token(credentials)
-            return make_response(jsonify(access_token), HTTPStatus.OK)
+            return Document(data=access_token).to_json(), HTTPStatus.OK
         except InvalidCourierError:
-            return make_response(jsonify({'msg' : 'Invalid login or password'}), HTTPStatus.BAD_REQUEST)
+            return make_response(jsonify({'error' : 'Invalid login or password'}), HTTPStatus.BAD_REQUEST)
 
     def validate_courier(courier):
         PL = 'ĄĆĘŁŃÓŚŹŻ'

@@ -5,10 +5,19 @@ from http import HTTPStatus
 from bcrypt import gensalt, hashpw, checkpw
 from flask_jwt_extended import create_access_token
 from exceptions.InvalidUserError import InvalidUserError
-from flask_hal import document 
+from flask_hal.document import Document
+from flask_hal.link import Link
 
 def construct(db):
     sender = Blueprint('sender_pages', __name__, static_folder='static')
+
+    @sender.route('/')
+    def sender_index():
+        links = []
+        links.append(Link('signup', '/sender/signup'))
+        links.append(Link('login', '/sender/login'))
+        links.append(Link('courier', '/courier'))
+        return Document(data={}, links=links).to_json()
 
     @sender.route('/signup', methods=['POST'])
     def sender_signup():
@@ -24,10 +33,9 @@ def construct(db):
         try:
             user = validate_signup_user(user)
             user = save_user(user)
-            #return make_response(jsonify(user), HTTPStatus.CREATED)
-            return document.Document(data=user, status=HTTPStatus.CREATED).to_json()
+            return Document(data=user), HTTPStatus.CREATED
         except InvalidUserError as e:
-            return make_response(jsonify({'msg' : str(e)}), HTTPStatus.BAD_REQUEST)
+            return make_response(jsonify({'error' : str(e)}), HTTPStatus.BAD_REQUEST)
 
 
     @sender.route('/login', methods=['POST'])
@@ -40,9 +48,9 @@ def construct(db):
         try:
             authenticate_user(credentials)
             access_token = get_access_token(credentials)
-            return make_response(jsonify(access_token), HTTPStatus.OK)
+            return Document(data=access_token).to_json(), HTTPStatus.OK
         except InvalidUserError:
-            return make_response({"msg" : "Invalid login or password"}, HTTPStatus.BAD_REQUEST)
+            return make_response({"error" : "Invalid login or password"}, HTTPStatus.BAD_REQUEST)
 
     def validate_signup_user(user):
         PL = 'ĄĆĘŁŃÓŚŹŻ'

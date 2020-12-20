@@ -6,33 +6,46 @@ import util, uuid
 from exceptions.LabelNotFoundError import LabelNotFoundError
 from exceptions.ParcelNotFoundError import ParcelNotFoundError
 from time import time
+from flask_hal.document import Document, Embedded
+from flask_hal.link import Link
 
 
 def construct(db):
     parcel_bp = Blueprint('parcel_pages', __name__, static_folder='static')
-  
+    
+    @parcel_bp.route('/')
+    def parcel_index():
+        links = []
+        links.append(Link('list', '/parcels/list'))
+        links.append(Link('find', '/parcels/<id>'))
+        return Document(data={}, links=links).to_json()
+
+
     #get single parcel, update its status
-    @parcel_bp.route('/<id>', methods=['PATCH'])
+    @parcel_bp.route('/<id>', methods=['GET','PATCH'])
     @jwt_required
     def parcel_single(id):
         current_user, role = util.get_current_user(get_jwt_identity())
         if request.method=='PATCH':
             if role != 'courier':
-                return make_response(jsonify({'msg' : 'You have to be a courier to update parcels'}), HTTPStatus.BAD_REQUEST)
+                return make_response(jsonify({'error' : 'You have to be a courier to update parcels'}), HTTPStatus.BAD_REQUEST)
             try:
+                links = []
                 parcel = update_parcel(id, request.json)
-                return make_response(jsonify(parcel), HTTPStatus.OK)
+                links.append(Link('parcel:patch', f'/parcels/{id}'))
+                links.append(Link('parcel:label', f'/labels/{parcel["label"]}'))
+                return Document(data=parcel, links=links).to_json()
             except ParcelNotFoundError as e:
-                return make_response(jsonify({'msg' : str(e)}), HTTPStatus.NOT_FOUND)
+                return make_response(jsonify({'error' : str(e)}), HTTPStatus.NOT_FOUND)
         if request.method=='GET':
             try:
                 if is_authorized(id, current_user, role):
                     parcel = get_single_parcel(id)
                     return make_response(jsonify(parcel), HTTPStatus.OK)
                 else:
-                    return make_response(jsonify({'msg' : 'You have to be a courier or an owner of the parcel'}), HTTPStatus.UNAUTHORIZED)
+                    return make_response(jsonify({'error' : 'You have to be a courier or an owner of the parcel'}), HTTPStatus.UNAUTHORIZED)
             except ParcelNotFoundError as e:
-                return make_response(jsonify({'msg' : str(e)}), HTTPStatus.NOT_FOUND)
+                return make_response(jsonify({'error' : str(e)}), HTTPStatus.NOT_FOUND)
 
     #get all your packages as a sender or courier
     @parcel_bp.route('/list', methods=['GET', 'POST'])
@@ -40,24 +53,30 @@ def construct(db):
     def parcel_list():
         current_user, role = util.get_current_user(get_jwt_identity())
         if request.method == 'GET':
+            links = []
+            links.append(Link('find', '/parcels/<id>'))
             if role == 'courier':
                 parcels = get_all_courier_parcels(current_user)
-                return make_response(jsonify(parcels), HTTPStatus.OK)
+                return Document(Embedded={'items' : Embedded(data=parcels)}, links=links).to_json()
             elif role == 'user':
                 parcels = get_all_sender_parcels(current_user)
-                return make_response(jsonify(parcels), HTTPStatus.OK)
+                return Document(Embedded={'items' : parcels}, links=links).to_json()
             else:
-                return make_response(jsonify({'msg' : 'You have to be either a courier or a sender to see your parcels'}), HTTPStatus.UNAUTHORIZED)
+                return make_response(jsonify({'error' : 'You have to be either a courier or a sender to see your parcels'}), HTTPStatus.UNAUTHORIZED)
         if request.method == 'POST':
             if role != 'courier':
-                return make_response(jsonify({'msg' : 'You have to be a courier to create a package'}), HTTPStatus.UNAUTHORIZED)
+                return make_response(jsonify({'error' : 'You have to be a courier to create a package'}), HTTPStatus.UNAUTHORIZED)
             try:
+                links = []
                 parcel = generate_parcel(request.json, current_user)
                 parcel = save_parcel(parcel)
                 update_label(request.json)
-                return make_response(jsonify(parcel), HTTPStatus.CREATED)
+                links.append('self', f'/parcels/{parcel["id"]}')
+                links.append('parcel:patch', f'/parcels/{id}')
+                links.append('parcel:label', f'/labels/{parcel["label"]}')
+                return Document(data=parcel, links=links).to_json(), HTTPStatus.CREATED 
             except LabelNotFoundError as e:
-                return make_response(jsonify({'msg' : str(e)}), HTTPStatus.BAD_REQUEST)
+                return make_response(jsonify({'error' : str(e)}), HTTPStatus.BAD_REQUEST)
 
     def generate_parcel(data, current_user):
         if not is_label(data.get('label')):
@@ -126,23 +145,25 @@ def construct(db):
         return user == current_user
     
     def get_all_courier_parcels(current_user):
-        parcels = []
+        items = []
         for key in db.scan_iter("parcel:*"):
             key = key.decode()
             if db.hget(key, "courier").decode() == current_user:
                 id =  key.split(':')[1]
                 parcel = get_single_parcel(id)
-                parcels.append(parcel)
-        return parcels
+                link = Link('self', f'/parcels/{id}')
+                items.append(Embedded(data=parcel, link=[link]))
+        return items
 
     def get_all_sender_parcels(current_user):
-        parcels = []
+        items = []
         for key in db.scan_iter("parcel:*"):
             key = key.decode()
             if db.hget(f"label:{db.hget(key, 'label').decode()}", "user").decode() == current_user:
                 id =  key.split(':')[1]
                 parcel = get_single_parcel(id)
-                parcels.append(parcel)
-        return parcels
+                link = Link('self', f'/parcels/{id}')
+                items.append(Embedded(data=parcel, links=[link]))
+        return items
 
     return parcel_bp
