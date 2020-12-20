@@ -14,8 +14,8 @@ def construct(db):
     @label_bp.route('/')
     def label_index():
         links = []
-        links.append('list', '/labels/list')
-        links.append('find', '/labels/<id>')
+        links.append(Link('list', '/labels/list'))
+        links.append(Link('find', '/labels/<id>'))
         document = Document(data={}, links=links)
         return document.to_json()
 
