@@ -57,10 +57,10 @@ def construct(db):
             links.append(Link('find', '/parcels/<id>'))
             if role == 'courier':
                 parcels = get_all_courier_parcels(current_user)
-                return Document(Embedded={'items' : Embedded(data=parcels)}, links=links).to_json()
+                return Document(embedded={'items' : Embedded(data=parcels)}, links=links).to_json()
             elif role == 'user':
                 parcels = get_all_sender_parcels(current_user)
-                return Document(Embedded={'items' : parcels}, links=links).to_json()
+                return Document(embedded={'items' : parcels}, links=links).to_json()
             else:
                 return make_response(jsonify({'error' : 'You have to be either a courier or a sender to see your parcels'}), HTTPStatus.UNAUTHORIZED)
         if request.method == 'POST':
