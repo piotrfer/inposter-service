@@ -52,7 +52,7 @@ def construct(db):
         try:
             authenticate_courier(credentials)
             access_token = get_access_token(credentials)
-            return Document(data=access_token).to_json(), HTTPStatus.OK
+            return Document(data={'token' : access_token}).to_json()
         except InvalidCourierError:
             return make_response(jsonify({'error' : 'Invalid login or password'}), HTTPStatus.BAD_REQUEST)
 

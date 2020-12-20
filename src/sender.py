@@ -33,7 +33,7 @@ def construct(db):
         try:
             user = validate_signup_user(user)
             user = save_user(user)
-            return Document(data=user), HTTPStatus.CREATED
+            return Document(data=user).to_json(), HTTPStatus.CREATED
         except InvalidUserError as e:
             return make_response(jsonify({'error' : str(e)}), HTTPStatus.BAD_REQUEST)
 
@@ -48,7 +48,7 @@ def construct(db):
         try:
             authenticate_user(credentials)
             access_token = get_access_token(credentials)
-            return Document(data=access_token).to_json(), HTTPStatus.OK
+            return Document(data={'token' : access_token}).to_json()
         except InvalidUserError:
             return make_response({"error" : "Invalid login or password"}, HTTPStatus.BAD_REQUEST)
 

@@ -130,7 +130,7 @@ def construct(db):
         return label
 
     def save_label(label):
-        label["id"] = uuid.uuid4()
+        label["id"] = str(uuid.uuid4())
         db.hset(f"label:{label['id']}", "user", label.get('user'))
         db.hset(f"label:{label['id']}", "name", label.get('name'))
         db.hset(f"label:{label['id']}", "address", label.get('address'))
