@@ -81,12 +81,12 @@ def construct(db):
         if request.method == 'GET':
             if role == 'user':
                 links = []
-                links.append('find', '/labels/<id>')
+                links.append(Link('find', '/labels/<id>'))
                 labels = get_user_labels(current_user)
                 return Document(embedded={'items' : Embedded(data=labels)}, links=links).to_json()
             elif role == 'courier':
                 links = []
-                links.append('find', '/labels/<id>')
+                links.append(Link('find', '/labels/<id>'))
                 labels = get_all_labels()
                 return Document(embedded={'items' : Embedded(data=labels)}, links=links).to_json()
             else:

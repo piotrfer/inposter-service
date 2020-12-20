@@ -71,9 +71,9 @@ def construct(db):
                 parcel = generate_parcel(request.json, current_user)
                 parcel = save_parcel(parcel)
                 update_label(request.json)
-                links.append('self', f'/parcels/{parcel["id"]}')
-                links.append('parcel:patch', f'/parcels/{id}')
-                links.append('parcel:label', f'/labels/{parcel["label"]}')
+                links.append(Link('self', f'/parcels/{parcel["id"]}'))
+                links.append(Link('parcel:patch', f'/parcels/{id}'))
+                links.append(Link('parcel:label', f'/labels/{parcel["label"]}'))
                 return Document(data=parcel, links=links).to_json(), HTTPStatus.CREATED 
             except LabelNotFoundError as e:
                 return make_response(jsonify({'error' : str(e)}), HTTPStatus.BAD_REQUEST)
