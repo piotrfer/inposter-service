@@ -18,7 +18,7 @@ SECRET_KEY = getenv("SECRET_KEY")
 JWT_SECRET_KEY = getenv("JWT_SECRET_KEY")
 APPLICATION_ROOT = '/api'
 
-db=from_url(getenv['REDISCLOUD_URL'])
+db=from_url(getenv('REDISCLOUD_URL'))
 
 try:
     db.info()
