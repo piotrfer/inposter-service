@@ -31,7 +31,7 @@ def construct(db):
                     links = []
                     links.append(Link('labels:list', '/labels/list'))
                     label = get_single_label(label_id)
-                    if (label["sent"]) == False:
+                    if (label["sent"]) == "False":
                         if role == 'user':
                             links.append(Link('label:patch', f'/labels/{label["id"]}'))
                             links.append(Link('label:delete', f'/labels/{label["id"]}'))
