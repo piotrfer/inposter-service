@@ -18,6 +18,7 @@ SECRET_KEY = getenv("SECRET_KEY")
 REDIS_HOST = getenv("REDIS_HOST")
 REDIS_PASS = getenv("REDIS_PASS")
 JWT_SECRET_KEY = getenv("JWT_SECRET_KEY")
+APPLICATION_ROOT = '/api'
 
 db = Redis(host=REDIS_HOST, port=6379, db=0)
 
