@@ -52,7 +52,7 @@ def construct(db):
                         links = []
                         links.append(Link('labels:list', '/labels/list'))
                         label = update_label(label_id,request.json)
-                        if label['sent' == False]:
+                        if label['sent'] == "False":
                             links.append(Link('label:patch', f'/labels/{label["id"]}'))
                             links.append(Link('label:delete', f'/labels/{label["id"]}'))
                         return Document(data=label, links=links).to_json(), HTTPStatus.OK
