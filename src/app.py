@@ -3,11 +3,11 @@ from flask import Flask
 import sender, label, courier, parcel
 from os import getenv
 from dotenv import load_dotenv
-from redis import Redis
+from redis import from_url
 from flask_jwt_extended import JWTManager
 from flask_hal import HAL
 from flask_hal.link import Link
-from flask_hal.document import Document, Embedded
+from flask_hal.document import Document
 
 app = Flask(__name__)
 HAL(app)
@@ -15,12 +15,10 @@ HAL(app)
 load_dotenv()
 SECRET_KEY = getenv("SECRET_KEY")
 #SESSION_COOKIE_HTTPONLY = True
-REDIS_HOST = getenv("REDIS_HOST")
-REDIS_PASS = getenv("REDIS_PASS")
 JWT_SECRET_KEY = getenv("JWT_SECRET_KEY")
 APPLICATION_ROOT = '/api'
 
-db = Redis(host=REDIS_HOST, port=6379, db=0)
+db=from_url(getenv['REDISCLOUD_URL'])
 
 try:
     db.info()
