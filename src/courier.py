@@ -56,6 +56,13 @@ def construct(db):
         except InvalidCourierError:
             return make_response(jsonify({'error' : 'Invalid login or password'}), HTTPStatus.BAD_REQUEST)
 
+    @courier_bp.route('/check/<login>')
+    def courier_check(login):
+        status = 'available'
+        if is_courier(login): status = 'taken'
+        return make_response(jsonify({login : status}))
+
+
     def validate_courier(courier):
         PL = 'ĄĆĘŁŃÓŚŹŻ'
         pl = 'ąćęłńóśźż'

@@ -9,9 +9,9 @@ from flask_hal.document import Document
 from flask_hal.link import Link
 
 def construct(db):
-    sender = Blueprint('sender_pages', __name__, static_folder='static')
+    sender_bp = Blueprint('sender_pages', __name__, static_folder='static')
 
-    @sender.route('/')
+    @sender_bp.route('/')
     def sender_index():
         links = []
         links.append(Link('signup', '/sender/signup'))
@@ -19,7 +19,7 @@ def construct(db):
         links.append(Link('courier', '/courier'))
         return Document(data={}, links=links).to_json()
 
-    @sender.route('/signup', methods=['POST'])
+    @sender_bp.route('/signup', methods=['POST'])
     def sender_signup():
         data = request.json
         user = {
@@ -38,7 +38,7 @@ def construct(db):
             return make_response(jsonify({'error' : str(e)}), HTTPStatus.BAD_REQUEST)
 
 
-    @sender.route('/login', methods=['POST'])
+    @sender_bp.route('/login', methods=['POST'])
     def sender_login():
         data = request.json
         credentials = {
@@ -51,6 +51,13 @@ def construct(db):
             return Document(data={'token' : access_token}).to_json()
         except InvalidUserError:
             return make_response({"error" : "Invalid login or password"}, HTTPStatus.BAD_REQUEST)
+
+
+    @sender_bp.route('/check/<login>')
+    def sender_check(login):
+        status = 'available'
+        if is_user(login): status = 'taken'
+        return make_response(jsonify({login : status}))
 
     def validate_signup_user(user):
         PL = 'ĄĆĘŁŃÓŚŹŻ'
@@ -122,4 +129,4 @@ def construct(db):
     def get_access_token(credentials):
             return create_access_token(identity=f"user:{credentials['login']}")
 
-    return sender
+    return sender_bp
