@@ -8,6 +8,7 @@ from flask_jwt_extended import JWTManager
 from flask_hal import HAL
 from flask_hal.link import Link
 from flask_hal.document import Document
+from redis import Redis
 
 app = Flask(__name__)
 HAL(app)
@@ -16,9 +17,12 @@ load_dotenv()
 SECRET_KEY = getenv("SECRET_KEY")
 #SESSION_COOKIE_HTTPONLY = True
 JWT_SECRET_KEY = getenv("JWT_SECRET_KEY")
-APPLICATION_ROOT = '/api'
+REDIS_HOST = getenv("REDIS_HOST")
+REDIS_PASS = getenv("REDIS_PASS")
+JWT_SECRET_KEY = getenv("JWT_SECRET_KEY")
 
-db=from_url(getenv('REDISCLOUD_URL'))
+db = Redis(host=REDIS_HOST, port=6379, db=0)
+
 
 try:
     db.info()

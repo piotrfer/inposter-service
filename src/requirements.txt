@@ -1,0 +1,8 @@
+Flask==1.1.2
+gunicorn==19.9.0
+Flask-Session==0.3.2
+redis==3.5.3
+python-dotenv==0.15.0
+bcrypt==3.2.0
+flask-jwt-extended
+flask-hal
