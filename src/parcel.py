@@ -28,7 +28,7 @@ def construct(db):
         current_user, role = util.get_current_user(get_jwt_identity())
         if request.method=='PATCH':
             if role != 'courier':
-                return make_response(jsonify({'error' : 'You have to be a courier to update parcels'}), HTTPStatus.BAD_REQUEST)
+                return make_response(jsonify({'error' : 'You have to be a courier to update parcels'}), HTTPStatus.BAD_REQUEST)     
             try:
                 links = []
                 parcel = update_parcel(id, request.json)
@@ -95,7 +95,7 @@ def construct(db):
         db.hset(f"parcel:{parcel['id']}", "id", parcel.get('id'))
         db.hset(f"parcel:{parcel['id']}", "label", parcel.get('label'))
         db.hset(f"parcel:{parcel['id']}", "courier", parcel.get('courier'))
-        db.hset(f"parcel:{parcel['id']}", "status", parcel.get('status'))
+        db.hset(f"parcel:{parcel['id']}", " ", parcel.get('status'))
         db.hset(f"parcel:{parcel['id']}", "received", parcel.get('received'))
         db.hset(f"parcel:{parcel['id']}", "delivered", parcel.get('delivered'))
         return parcel
@@ -152,7 +152,7 @@ def construct(db):
                 id =  key.split(':')[1]
                 parcel = get_single_parcel(id)
                 link = Link('self', f'/parcels/{id}')
-                items.append(Embedded(data=parcel, link=[link]))
+                items.append(Embedded(data=parcel, links=[link]))
         return items
 
     def get_all_sender_parcels(current_user):

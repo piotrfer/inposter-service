@@ -42,6 +42,13 @@ app.register_blueprint(courier.construct(db), url_prefix='/courier')
 app.register_blueprint(label.construct(db), url_prefix='/labels')
 app.register_blueprint(parcel.construct(db), url_prefix='/parcels')
 
+@app.after_request
+def disable_cors(response):
+    response.headers.add("Access-Control-Allow-Origin", "*")
+    response.headers.add("Access-Control-Allow-Headers", "*")
+    response.headers.add("Access-Control-Allow-Methods", "*")
+    return response
+
 @app.route('/')
 def index():
     links = []
