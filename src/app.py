@@ -15,13 +15,15 @@ HAL(app)
 
 load_dotenv()
 SECRET_KEY = getenv("SECRET_KEY")
-#SESSION_COOKIE_HTTPONLY = True
+# SESSION_COOKIE_HTTPONLY = True
 JWT_SECRET_KEY = getenv("JWT_SECRET_KEY")
-REDIS_HOST = getenv("REDIS_HOST")
-REDIS_PASS = getenv("REDIS_PASS")
+# REDIS_HOST = getenv("REDIS_HOST")
+# REDIS_PASS = getenv("REDIS_PASS")
 JWT_SECRET_KEY = getenv("JWT_SECRET_KEY")
 
-db = Redis(host=REDIS_HOST, port=6379, db=0)
+
+# db = Redis(host=REDIS_HOST, port=6379, db=0)
+db=from_url(getenv('REDISCLOUD_URL'))
 
 
 try:
