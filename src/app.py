@@ -62,4 +62,4 @@ def index():
     return document.to_json()
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)
