@@ -63,6 +63,51 @@ def construct(db):
         return make_response(jsonify({login : status}))
 
 
+    @sender_bp.route('/auth0', methods=['POST'])
+    def process_auth0():
+        
+        auth0user = {
+            "email" : request.json.get('email'),
+            "firstname" : request.json.get('name'),
+            "lastname" : '',
+            "login" : 'auth0'+request.json.get('email'),
+            "password" : request.json.get('sub'),
+            "licence" : '',
+        }
+        
+        # validate all fields here
+
+        if is_courier(auth0user.get('login')):
+            """ Try to authenticate existing auth0user """
+            try:
+                authenticate_courier(auth0user)
+                access_token = get_access_token({"login": auth0user.get("login")})
+                return Document(data={'token': access_token}).to_json()
+            except InvalidCourierError as e:
+                return make_response(jsonify({'error': str(e)}), HTTPStatus.BAD_REQUEST)
+        else:
+            """ Register and login auth0user """
+            register_auth0(auth0user)
+            try:
+                authenticate_courier(auth0user)
+                access_token = get_access_token({"login": auth0user.get("login")})
+                return Document(data={'token': access_token}).to_json()
+            except InvalidCourierError as e:
+                return make_response(jsonify({'error': str(e)}), HTTPStatus.BAD_REQUEST)
+
+
+    def register_auth0(auth0user):
+        db.hset(f"courier:{auth0user['login']}", "firstname", auth0user["firstname"])
+        db.hset(f"courier:{auth0user['login']}", "lastname", auth0user["lastname"])
+        db.hset(f"courier:{auth0user['login']}", "licence", auth0user["licence"])
+        db.hset(f"courier:{auth0user['login']}", "email", auth0user["email"])
+
+        hashed = hashpw(auth0user["password"].encode('utf-8'), gensalt(5))
+        db.hset(f"courier:{auth0user['login']}", "password", hashed)
+
+        return auth0user
+
+
     def validate_courier(courier):
         PL = 'ĄĆĘŁŃÓŚŹŻ'
         pl = 'ąćęłńóśźż'

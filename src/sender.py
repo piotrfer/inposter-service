@@ -59,7 +59,7 @@ def construct(db):
             status = 'taken'
         return make_response(jsonify({login: status}))
 
-    @sender_bp.route('/auth0')
+    @sender_bp.route('/auth0', methods=['POST'])
     def process_auth0():
         
         auth0user = {
