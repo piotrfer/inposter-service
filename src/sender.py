@@ -9,7 +9,7 @@ from flask_hal.document import Document
 from flask_hal.link import Link
 
 
-def construct(db):
+def construct(db, rabbit):
     sender_bp = Blueprint('sender_pages', __name__, static_folder='static')
 
     @sender_bp.route('/')
@@ -50,6 +50,7 @@ def construct(db):
             access_token = get_access_token(credentials)
             return Document(data={'token': access_token}).to_json()
         except InvalidUserError:
+            rabbit.send_message("sender - invalid login attempt")
             return make_response({"error": "Invalid login or password"}, HTTPStatus.BAD_REQUEST)
 
     @sender_bp.route('/check/<login>')

@@ -8,7 +8,7 @@ from exceptions.InvalidLabelError import InvalidLabelError
 from exceptions.LabelNotFoundError import LabelNotFoundError
 from exceptions.UserNotAuthorizedError import UserNotAuthorizedError
 
-def construct(db):
+def construct(db, rabbit):
     label_bp = Blueprint('label_pages', __name__, static_folder='static')
 
     @label_bp.route('/')
@@ -39,6 +39,7 @@ def construct(db):
                             links.append(Link('label:generate', '/parcels'))
                     return Document(data=label, links=links).to_json()
                 else:
+                    rabbit.send_message("Label - unathorized get request")
                     return make_response(jsonify({'error' : 'You have to be an owner or a courier to see this label'}), HTTPStatus.UNAUTHORIZED)
             except LabelNotFoundError as e:
                 return make_response(jsonify({'error' : str(e)}), HTTPStatus.NOT_FOUND)
@@ -56,6 +57,7 @@ def construct(db):
                             links.append(Link('label:patch', f'/labels/{label["id"]}'))
                             links.append(Link('label:delete', f'/labels/{label["id"]}'))
                         return Document(data=label, links=links).to_json(), HTTPStatus.OK
+                    rabbit.send_message("Label - unathorized patch request")
                     return make_response(jsonify({'error' : 'You can only edit labels that you own'}), HTTPStatus.UNAUTHORIZED)
                 except LabelNotFoundError as e:
                     return make_response(jsonify({'error' : str(e)}), HTTPStatus.NOT_FOUND)
@@ -68,6 +70,7 @@ def construct(db):
                     if is_authorized(label_id, current_user, role):
                         delete_label(label_id)
                         return make_response(''),HTTPStatus.NO_CONTENT
+                    rabbit.send_message("Label - unathorized delete request")    
                     return make_response(jsonify({'error' : 'You can only delete labels that you own'}), HTTPStatus.UNAUTHORIZED)
                 except LabelNotFoundError as e:
                     return make_response(jsonify({'error' : str(e)}), HTTPStatus.NOT_FOUND)
@@ -90,6 +93,7 @@ def construct(db):
                 labels = get_all_labels()
                 return Document(embedded={'items' : Embedded(data=labels)}, links=links).to_json()
             else:
+                rabbit.send_message("Label - unathorized get list request")
                 return make_response({'error': 'you have to be a sender or a courier to see labels'},HTTPStatus.UNAUTHORIZED)
         if request.method == 'POST':
             if db.hexists(f"user:{current_user}", "role"):
@@ -114,6 +118,7 @@ def construct(db):
                     return make_response(jsonify({'error' : str(e)}), HTTPStatus.BAD_REQUEST)
 
             else:
+                rabbit.send_message("Label - unathorized post request")
                 return make_response({'error': 'you have to be a sender to create labels'}, HTTPStatus.UNAUTHORIZED)
 
 

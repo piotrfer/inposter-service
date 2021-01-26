@@ -6,3 +6,4 @@ python-dotenv==0.15.0
 bcrypt==3.2.0
 flask-jwt-extended
 flask-hal
+pika

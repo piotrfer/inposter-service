@@ -1,4 +1,3 @@
-import http
 from os import access
 import re
 from flask import Blueprint
@@ -11,7 +10,7 @@ from flask_hal.link import Link
 from exceptions.InvalidCourierError import InvalidCourierError
 
 
-def construct(db):
+def construct(db, rabbit):
 
     courier_bp = Blueprint('courier_pages', __name__, static_folder='static')
 
@@ -54,6 +53,7 @@ def construct(db):
             access_token = get_access_token(credentials)
             return Document(data={'token' : access_token}).to_json()
         except InvalidCourierError:
+            rabbit.send_message('courier - ivalid login attempt') 
             return make_response(jsonify({'error' : 'Invalid login or password'}), HTTPStatus.BAD_REQUEST)
 
     @courier_bp.route('/check/<login>')
