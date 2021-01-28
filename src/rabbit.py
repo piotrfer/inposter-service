@@ -25,9 +25,13 @@ class Rabbit:
     def send_message(self, message, queue=None):
         asyncio.run(self._send_message(message, queue))
 
+    #sends message throufh default (broadcast) queue and queue passed as parameter 
     async def _send_message(self, message, queue=None):
         if not queue:
-            queue = self.default_queue
+            self.channel.basic_publish(exchange='',
+                routing_key=self.default_queue,
+                body=self._wrap_message(message))
+            return
 
         self.channel.basic_publish(exchange='',
                 routing_key=queue,

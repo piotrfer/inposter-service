@@ -102,6 +102,7 @@ def construct(db, rabbit):
         db.hset(f"parcel:{parcel['id']}", " ", parcel.get('status'))
         db.hset(f"parcel:{parcel['id']}", "received", parcel.get('received'))
         db.hset(f"parcel:{parcel['id']}", "delivered", parcel.get('delivered'))
+        rabbit.send_message(f"parcel id:{parcel.get('id')} created for courier: {parcel.get('courier')}", "inposter-packages")
         return parcel
     
     def update_label(data):
@@ -121,9 +122,13 @@ def construct(db, rabbit):
         updated_status = data.get("status")
         status_list = ["received", "in progress", "delivered"]
         if updated_status in status_list:
-           db.hset(f"parcel:{id}", "status", updated_status)
-           if updated_status == 'delivered':
-               db.hset(f"parcel:{id}", "delivered", time())
+            
+            db.hset(f"parcel:{id}", "status", updated_status)
+            if updated_status == 'delivered':
+                db.hset(f"parcel:{id}", "delivered", time())
+                rabbit.send_message(f"parcel id:{id} was delivered")
+            else:
+                rabbit.send_message(f"parcel id:{id} updated to status: {updated_status}", "inposter-packages")
         return get_single_parcel(id)
 
     def get_single_parcel(id):
