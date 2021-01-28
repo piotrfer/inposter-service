@@ -10,7 +10,7 @@ from flask_hal.document import Document, Embedded
 from flask_hal.link import Link
 
 
-def construct(db):
+def construct(db, rabbit):
     parcel_bp = Blueprint('parcel_pages', __name__, static_folder='static')
     
     @parcel_bp.route('/')
@@ -28,6 +28,7 @@ def construct(db):
         current_user, role = util.get_current_user(get_jwt_identity())
         if request.method=='PATCH':
             if role != 'courier':
+                rabbit.send_message("Parcel - unathorized patch request")
                 return make_response(jsonify({'error' : 'You have to be a courier to update parcels'}), HTTPStatus.BAD_REQUEST)     
             try:
                 links = []
@@ -43,6 +44,7 @@ def construct(db):
                     parcel = get_single_parcel(id)
                     return make_response(jsonify(parcel), HTTPStatus.OK)
                 else:
+                    rabbit.send_message("Parcel - unathorized get request")
                     return make_response(jsonify({'error' : 'You have to be a courier or an owner of the parcel'}), HTTPStatus.UNAUTHORIZED)
             except ParcelNotFoundError as e:
                 return make_response(jsonify({'error' : str(e)}), HTTPStatus.NOT_FOUND)
@@ -62,9 +64,11 @@ def construct(db):
                 parcels = get_all_sender_parcels(current_user)
                 return Document(embedded={'items' : Embedded(data=parcels)}, links=links).to_json()
             else:
+                rabbit.send_message("Parcel - unathorized get list request")
                 return make_response(jsonify({'error' : 'You have to be either a courier or a sender to see your parcels'}), HTTPStatus.UNAUTHORIZED)
         if request.method == 'POST':
             if role != 'courier':
+                rabbit.send_message("Parcel - unathorized post request")
                 return make_response(jsonify({'error' : 'You have to be a courier to create a package'}), HTTPStatus.UNAUTHORIZED)
             try:
                 links = []
@@ -98,6 +102,7 @@ def construct(db):
         db.hset(f"parcel:{parcel['id']}", " ", parcel.get('status'))
         db.hset(f"parcel:{parcel['id']}", "received", parcel.get('received'))
         db.hset(f"parcel:{parcel['id']}", "delivered", parcel.get('delivered'))
+        rabbit.send_message(f"parcel id:{parcel.get('id')} created for courier: {parcel.get('courier')}", "inposter-packages")
         return parcel
     
     def update_label(data):
@@ -117,9 +122,13 @@ def construct(db):
         updated_status = data.get("status")
         status_list = ["received", "in progress", "delivered"]
         if updated_status in status_list:
-           db.hset(f"parcel:{id}", "status", updated_status)
-           if updated_status == 'delivered':
-               db.hset(f"parcel:{id}", "delivered", time())
+            
+            db.hset(f"parcel:{id}", "status", updated_status)
+            if updated_status == 'delivered':
+                db.hset(f"parcel:{id}", "delivered", time())
+                rabbit.send_message(f"parcel id:{id} was delivered")
+            else:
+                rabbit.send_message(f"parcel id:{id} updated to status: {updated_status}", "inposter-packages")
         return get_single_parcel(id)
 
     def get_single_parcel(id):
